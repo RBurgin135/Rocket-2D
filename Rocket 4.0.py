@@ -182,7 +182,8 @@ def Background(Num):
 def AI(Pop):
     for i in range(0,len(Pop)):
         if Pop[i].tested == False:
-            result = Pop[i].Nn.Forward(Pop[i].disp, Pop[i].u, Pop[i].a, Pop[i].fuel, Pop[i].deg)
+            ForwardInputs = [Pop[i].disp[0],Pop[i].disp[1], Pop[i].u[0], Pop[i].u[1], Pop[i].a[0], Pop[i].a[1], Pop[i].fuel, Pop[i].deg]
+            result = Pop[i].Nn.Forward(ForwardInputs)
             if result[0] > 0.5:
                 Pop[i].Active()
             if result[1] > 0.5:
@@ -221,7 +222,6 @@ def Diagnostics(Pop):
 def GenerationMngmnt(Pop, GenNumber):
     GenTest = True
     for i in range(0, PopSize):
-        #if Pop[i].crash == False and Pop[i].SUCCESS == False:
         if Pop[i].tested == False:
             GenTest = False
 
