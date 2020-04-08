@@ -40,8 +40,8 @@ class Rocket:
         self.width = self.image.get_width()
         self.height = self.image.get_height()
 
-        X = G.X - self.disp[0] - self.width()/2
-        Y = G.Y - self.disp[1] - self.height()/2
+        X = G.X - self.disp[0] - self.width/2
+        Y = G.Y - self.disp[1] - self.height/2
         self.blit = [X - self.image.get_width()/2, Y - self.image.get_height()/2]
 
         #testing values
@@ -77,7 +77,6 @@ class Rocket:
         self.thrust = -opp
         self.thrust = adj
 
-=====================================================================
     def Calculate(self):
         #find updated mass
         self.F_m = self.fuel * 0.02
@@ -85,7 +84,7 @@ class Rocket:
 
         for i in range(0,1):
             #find resultant force in axis (F=ma)       
-            Resultant_F = (g*self.Total_m) + self.thrust
+            Resultant_F = (g*self.Total_m) + self.thrust[i]
 
             self.a[i] = 0
             if Resultant_F != 0:
@@ -94,29 +93,34 @@ class Rocket:
             #find displacement on axis (s = ut- 1/2 at^2)
             self.s[i] = self.u[i] - 0.5*self.a[i]
 
-            #crash and success query============================================
-            if (self.disp[i] - self.s[i]) <=0:
-                if (self.crash == False) and (self.u > 25):
-                    #============================================================
-                    self.crash = True
-                    self.tested = True
-                    self.testU[i] = self.u[i]
-                if self.crash == False and (self.blitX > P.X and (self.blitX+self.width) < (P.X+P.width)):
-                    self.SUCCESS = True
-                    self.tested = True
-                    self.testU = self.u[i]
-                
+            #crash and success query
+        if (self.disp[1] - self.s[1]) <=0:
+            if (self.crash == False) and (self.u > 25):
+                self.crash = True
+                self.tested = True
+                self.testU[0] = self.u[0]
+                self.testU[1] = self.u[1]
+            if self.crash == False and (self.blit[0] > P.X and (self.blit[0]+self.width) < (P.X+P.width)):
+                self.SUCCESS = True
+                self.tested = True
+                self.testU[0] = self.u[0]
+                self.testU[1] = self.u[1]
+
+            #prevents movement once landing
+            for i in range(0,1):
                 self.s[i] = 0
                 self.u[i] = 0
                 self.deg = 0
 
-                self.disp[i] -= self.s[i]
-                self.blit[i] += self.s[i]
+        #displaces rocket1
+        for i in range(0,1):
+            self.disp[i] -= self.s[i]
+            self.blit[i] += self.s[i]
 
 
         #show rocket
-        window.blit(self.image,(self.blit[0]] , self.blit[1]))
-=====================================================================
+        window.blit(self.image,(self.blit[0] , self.blit[1]))
+
     def Reset(self):
         #find velocity used in next Calculate (v = u + at)
         for i in range(0,1):
@@ -188,8 +192,12 @@ def AI(Pop):
                 Pop[i].Active()
             if result[1] > 0.5:
                 Pop[i].deg += 1
-            if result[0] > 0.5:
-                Pop[i].deg += 1
+                if Pop[i].deg > 180:
+                    Pop[i].deg = -180 
+            if result[2] > 0.5:
+                Pop[i].deg -= 1
+                if Pop[i].deg < -180:
+                    Pop[i].deg = 180 
 
 def Diagnostics(Pop):
     Y = scr_height-40
@@ -232,19 +240,13 @@ def GenerationMngmnt(Pop, GenNumber):
         
         NewNets = Networking.Review(Pop)
 
-
-        #new gen
+        #new gen reset rockets
         StartAltitude = random.randint(2500,5000)
+        StartDisplacement = random.randint(2500,5000)
         for i in range(0,len(NewNets)):
             Pop[i].Nn = NewNets[i]
-            Pop[i].__init__(StartAltitude, True)
+            Pop[i].__init__(StartDisplacement, StartAltitude, True)
 
-        NewRockets = []
-        for i in range(0, PopSize - len(NewNets)):
-            NewRockets.append(Rocket(StartAltitude, False))
-            Pop.pop(len(NewNets))
-
-        Pop = Pop + NewRockets
     return GenNumber, Pop
 
 G = Ground()
