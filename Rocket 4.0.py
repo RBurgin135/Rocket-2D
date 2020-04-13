@@ -26,11 +26,12 @@ pygame.display.set_caption("Rocket 3.0")
 class Rocket:
     def __init__(self, disp, Alt, Overide):
         #Rocket values
-        self.fuel = 100
+        self.fuel = 50
         self.disp = [disp,Alt]
         self.strength = -25
         self.thrust = [0,0]
         self.deg = 0
+        self.turn =  "NOT"
 
         #pygame content
         self.On = pygame.image.load("Rocket on.png")
@@ -40,9 +41,9 @@ class Rocket:
         self.width = self.image.get_width()
         self.height = self.image.get_height()
 
-        X = G.X - self.disp[0] - self.width/2
-        Y = G.Y - self.disp[1] - self.height/2
-        self.blit = [X - self.image.get_width()/2, Y - self.image.get_height()/2]
+        X = P.X + P.width/2 + self.disp[0] - self.width/2
+        Y = P.Y - self.disp[1]- self.height/2
+        self.coord = [X , Y]
 
         #testing values
         self.crash = False
@@ -65,7 +66,7 @@ class Rocket:
 
     def Active(self):
         if self.fuel > 0:
-            self.strength
+            self.strength = -25
             self.fuel -=1
             self.image = self.On
         else:
@@ -74,61 +75,81 @@ class Rocket:
         radians = math.radians(self.deg)
         opp = self.strength * math.sin(radians)
         adj = self.strength * math.cos(radians)
-        self.thrust = -opp
-        self.thrust = adj
+        self.thrust[0] = -opp
+        self.thrust[1] = adj
 
     def Calculate(self):
         #find updated mass
-        self.F_m = self.fuel * 0.02
+        self.F_m = self.fuel * 0.03
         self.Total_m = self.R_m + self.F_m
 
-        for i in range(0,1):
-            #find resultant force in axis (F=ma)       
-            Resultant_F = (g*self.Total_m) + self.thrust[i]
+        Resultant_F = []
+        #find resultant force in axis (F=ma)       
+        Resultant_F.append( self.thrust[0] )
+        Resultant_F.append( (g*self.Total_m) + self.thrust[1] )
 
+
+        for i in range (0,2):
             self.a[i] = 0
-            if Resultant_F != 0:
-                self.a[i] =  Resultant_F / self.Total_m
+            if Resultant_F[i] != 0:
+                self.a[i] =  Resultant_F[i] / self.Total_m
 
             #find displacement on axis (s = ut- 1/2 at^2)
             self.s[i] = self.u[i] - 0.5*self.a[i]
 
             #crash and success query
         if (self.disp[1] - self.s[1]) <=0:
-            if (self.crash == False) and (self.u > 25):
+            if (self.crash == False) and (self.u[1] > 25):
                 self.crash = True
                 self.tested = True
                 self.testU[0] = self.u[0]
                 self.testU[1] = self.u[1]
-            if self.crash == False and (self.blit[0] > P.X and (self.blit[0]+self.width) < (P.X+P.width)):
+            if self.crash == False and (self.coord[0] > P.X and (self.coord[0]+self.width) < (P.X+P.width)):
                 self.SUCCESS = True
                 self.tested = True
                 self.testU[0] = self.u[0]
                 self.testU[1] = self.u[1]
-
             #prevents movement once landing
-            for i in range(0,1):
+            for i in range (0,2):
                 self.s[i] = 0
                 self.u[i] = 0
                 self.deg = 0
 
-        #displaces rocket1
-        for i in range(0,1):
-            self.disp[i] -= self.s[i]
-            self.blit[i] += self.s[i]
+
+        #displaces rocket
+        self.disp[0] += self.s[0]
+        self.coord[0] -= self.s[0]
+        self.disp[1] -= self.s[1]
+        self.coord[1] += self.s[1]
 
 
         #show rocket
-        window.blit(self.image,(self.blit[0] , self.blit[1]))
+        result = pygame.transform.rotate(self.image, self.deg)
+        self.blit = [self.coord[0] - result.get_width()/2, self.coord[1] - result.get_height()/2]
+        window.blit(result,(self.blit[0] , self.blit[1]))
 
     def Reset(self):
         #find velocity used in next Calculate (v = u + at)
-        for i in range(0,1):
+        for i in range (0,2):
             self.u[i] = self.u[i] + self.a[i]
 
             #reset values
             self.thrust[i] = 0
+        self.strength = 0
         self.image = self.Off
+        self.turn = "NOT"
+
+    def TurnLeft(self):
+        self.deg += 1
+        if self.deg > 180:
+            self.deg = -179
+        self.turn = pygame.image.load("Left.png")
+        
+    def TurnRight(self):
+        self.deg -= 1
+        if self.deg < -180:
+            self.deg = 179 
+        self.turn = pygame.image.load("Right.png")
            
 #======
 class Ground:
@@ -186,18 +207,14 @@ def Background(Num):
 def AI(Pop):
     for i in range(0,len(Pop)):
         if Pop[i].tested == False:
-            ForwardInputs = [Pop[i].disp[0],Pop[i].disp[1], Pop[i].u[0], Pop[i].u[1], Pop[i].a[0], Pop[i].a[1], Pop[i].fuel, Pop[i].deg]
-            result = Pop[i].Nn.Forward(ForwardInputs)
+            Inputs = [Pop[i].disp[0],Pop[i].disp[1], Pop[i].u[0], Pop[i].u[1], Pop[i].a[0], Pop[i].a[1], Pop[i].fuel, Pop[i].deg]
+            result = Pop[i].Nn.Forward(Inputs)
             if result[0] > 0.5:
                 Pop[i].Active()
             if result[1] > 0.5:
-                Pop[i].deg += 1
-                if Pop[i].deg > 180:
-                    Pop[i].deg = -180 
+                Pop[i].TurnLeft()
             if result[2] > 0.5:
-                Pop[i].deg -= 1
-                if Pop[i].deg < -180:
-                    Pop[i].deg = 180 
+                Pop[i].TurnRight()
 
 def Diagnostics(Pop):
     Y = scr_height-40
@@ -226,6 +243,9 @@ def Diagnostics(Pop):
                 pygame.draw.rect(window,(76,166,76),details)
             else:
                 pygame.draw.rect(window,(166,166,166),details)
+        
+        if Pop[i].turn != "NOT":
+            window.blit(Pop[i].turn,(X+5,Y))
 
 def GenerationMngmnt(Pop, GenNumber):
     GenTest = True
@@ -241,19 +261,51 @@ def GenerationMngmnt(Pop, GenNumber):
         NewNets = Networking.Review(Pop)
 
         #new gen reset rockets
-        StartAltitude = random.randint(2500,5000)
-        StartDisplacement = random.randint(2500,5000)
-        for i in range(0,len(NewNets)):
+        StartAltitude = random.randint(2500,2500)
+        StartDisplacement = random.randint(-500,-500)
+        for i in range(0,PopSize):
             Pop[i].Nn = NewNets[i]
             Pop[i].__init__(StartDisplacement, StartAltitude, True)
 
     return GenNumber, Pop
 
+def NNDiag(Pop):
+    Net = Pop[0].Nn
+    Layers = [Net.InputLayer, Net.HiddenLayer, Net.OutputLayer]
+    ICenters = []
+    HCenters = []
+    OCenters = []
+
+    #draws circles
+    for x in range(0, 3):
+        for y in range(0, len(Layers[x])):
+            pygame.draw.circle(window, (166,166,166), (1200+200*x,50+y*70), 30, 0)
+            if x == 0:
+                ICenters.append((1200+200*x,50+y*70))
+            elif x == 1:
+                HCenters.append((1200+200*x,50+y*70))
+            elif x == 2:
+                OCenters.append((1200+200*x,50+y*70))
+
+    #draws lines
+    CombinedCenters = [ICenters,HCenters,OCenters]
+    for L in range(0,len(CombinedCenters)-1):
+        for O in range(0, len(CombinedCenters[L])):
+            for D in range(0, len(CombinedCenters[L+1])):
+                if Layers[L+1][D].weight[O] > 0:
+                    colour = (173,216,230)
+                else:
+                    colour = (128,0,0)
+                width = int(round(abs(Layers[L+1][D].weight[O])*5))
+                if width == 0:
+                    width = 1
+                pygame.draw.line(window, colour, CombinedCenters[L][O], CombinedCenters[L+1][D], width)
+
 G = Ground()
 P = Pad()
 Pop = []
-StartAltitude = random.randint(2500,5000)
-StartDisplacement = random.randint(2500,5000)
+StartAltitude = random.randint(2500,2500)
+StartDisplacement = random.randint(-500,-500)
 for i in range(0,PopSize):
     Pop.append(Rocket(StartDisplacement, StartAltitude, False))
 GenNumber = 1
@@ -271,6 +323,7 @@ while RUN:
     G.Show()
     P.Show()
     Diagnostics(Pop)
+    NNDiag(Pop)
 
     pygame.display.update()
     for i in range(0, PopSize):

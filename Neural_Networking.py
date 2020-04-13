@@ -2,6 +2,7 @@
 #===================================================================================================================================================================
 #===================================================================================================================================================================
 
+import copy
 import math
 import random
 import numpy
@@ -10,7 +11,7 @@ import numpy
 class NeuralNet:
     def __init__(self):
         self.InputNum = 8
-        self.HiddenNum = 6
+        self.HiddenNum = 4
         self.OutputNum = 3
 
         #layers
@@ -24,12 +25,12 @@ class NeuralNet:
 
         #Hidden
         for i in range(0,self.HiddenNum):
-            self.HiddenLayer.append(Neuron(1))
+            self.HiddenLayer.append(Neuron(self.InputNum))
 
         #Outputs
         #Thrust, Turn left, Turn right
         for i in range(0,self.OutputNum):
-            self.OutputLayer.append(Neuron(1))
+            self.OutputLayer.append(Neuron(self.HiddenNum))
 
         #Score
         self.score = 0
@@ -43,27 +44,23 @@ class NeuralNet:
         #Hidden
         OutputInputs = []
         for i in range(0, self.HiddenNum):
-            OutputInputs.append(self.HiddenLayer[i].ActivationFunction(HiddenInputs[i])) 
+            OutputInputs.append(self.HiddenLayer[i].ActivationFunction(HiddenInputs)) 
 
         #Output
         OutputOutputs = []
         for i in range(0, self.OutputNum):
-            OutputOutputs.append(self.OutputLayer[i].ActivationFunction(OutputInputs[i])) 
+            OutputOutputs.append(self.OutputLayer[i].ActivationFunction(OutputInputs)) 
 
         return  OutputOutputs
 
-    def Scoring(self, Velo, Fuel, Success, Disp):
-        Score_V = (-Velo[0] *10) + (-Velo[1] *10)
-        Score_F = Fuel
-        if Disp < 0:
-            Score_D = Disp * 100
-        else:
-            Score_D = -Disp * 100
-        Score_S = 0
-        if Success == True:
-            Score_S = 10000
-
-        self.score = Score_S  + Score_V + Score_F + Score_D
+    def Scoring(self, Details):
+        self.score = 0
+        self.score += -abs(Details[0])*1000 
+        #self.score += -Details[1][0] * 50
+        #self.score += -Details[1][1] * 50
+        #self.score += Details[2] * 10
+        if Details[3] == True:
+            self.score += 1000000
 
 #======= 
 class Neuron:
@@ -75,14 +72,22 @@ class Neuron:
 
     def ActivationFunction(self, Input):
         total = sum(numpy.multiply(Input,self.weight))
-        return (self.ReLU(total)+ self.bias)
+        return (self.sigmoid(total)+ self.bias)
 
     def ReLU(self, x):
         result = max(x, 0)
         return result
 
     def sigmoid(self, x):
-        result = 1/(1+math.exp(-x))
+        try:
+            result = 1/(1+math.exp(-x))
+        except:
+            OverflowError
+            if x>0:
+                result = 1
+            else:
+                result = 0
+
         return result
 
     def step(self, x):
@@ -97,32 +102,31 @@ def Review(Pop):
     NewNetlist = []
     for i in range(0,len(Pop)):
         Netlist.append(Pop[i].Nn) 
-        Netlist[len(Netlist)-1].Scoring(Pop[i].testU, Pop[i].fuel, Pop[i].SUCCESS, Pop[i].disp[0])
+        Netlist[len(Netlist)-1].Scoring([Pop[i].disp[0], Pop[i].testU, Pop[i].fuel, Pop[i].SUCCESS])
     
     Netlist = Sort(Netlist)
-    #breed
-    Breedlist = Breed(Netlist)
-    print("Breedlist length: ",len(Breedlist))
+    #print("Score: ",Pop[0].Nn.score)
+    #print("Velocity: ",Pop[0].testU)
 
-    #clone
-    for i in range(0,int(len(Pop)//6)):
-        NewNetlist.append(Netlist[0])
-        Netlist.pop(0)
+    #Clone
+    CloneNo = int(len(Pop)//6)
+    for i in range(0, CloneNo):
+        NewNetlist.append(copy.deepcopy(Netlist[i]))
 
-    NewNetlist = NewNetlist + Breedlist
-    
-    #mutate
-    Mutatelist = []
-    for i in range(int(len(Pop)//6)-1 ,len(Netlist)):
-        result = Netlist[i]
-        if random.uniform(0,1)> 0.5:
-            result = Mutate(Netlist[i])
-        Mutatelist.append(result)
+    #Breed
+    BreedNo =  int(len(Pop)//2)
+    for i in range(0, BreedNo):
+        A = copy.deepcopy(Netlist[random.randint(0, len(Netlist)-1)//2])
+        B = copy.deepcopy(Netlist[random.randint(0, len(Netlist)-1)//2])
+        NewNetlist.append(Breed(A,B))
 
-    #The rest of Netlist are removed
-    NewNetlist = NewNetlist + Mutatelist
+    #Mutate
+    MutateNo = len(Pop) - (BreedNo + CloneNo)
+    for i in range(0, MutateNo):
+        TestSubject = copy.deepcopy(Netlist[random.randint(0, len(Netlist)-1)])
+        NewNetlist.append(Mutate(TestSubject))
 
-    return NewNetlist
+    return Sort(NewNetlist)
 
 def Sort(List):
     #Bubble sort
@@ -135,63 +139,63 @@ def Sort(List):
                 Buffer = List[i]
                 List[i] = List[i+1]
                 List[i+1] = Buffer
-    
+
+
     return List
 
 def Mutate(Net):
     #Fence is the max degree of mutation, prob is the likelihood of mutating
-    fence = 0.5
-    prob = 0.2
+    fence = 0.01
+    prob = 0.7
     
     #Inputs
     for x in range(0, len(Net.InputLayer)):
-            for y in range(0, len(Net.InputLayer[x].weight)):
-                if random.random() > prob:
-                    Net.InputLayer[x].weight[y] += random.uniform(-fence,fence)
+        for y in range(0, len(Net.InputLayer[x].weight)):
             if random.random() > prob:
-                Net.InputLayer[x].bias += random.uniform(-fence,fence)
+                Net.InputLayer[x].weight[y] += random.uniform(-fence,fence)
+        if random.random() > prob:
+            Net.InputLayer[x].bias += random.uniform(-fence,fence)
 
     #Hidden
     for x in range(0, len(Net.HiddenLayer)):
-            for y in range(0, len(Net.HiddenLayer[x].weight)):
-                if random.random() > prob:
-                    Net.HiddenLayer[x].weight[y] += random.uniform(-fence,fence)
+        for y in range(0, len(Net.HiddenLayer[x].weight)):
             if random.random() > prob:
-                Net.HiddenLayer[x].bias += random.uniform(-fence,fence)
+                Net.HiddenLayer[x].weight[y] += random.uniform(-fence,fence)
+        if random.random() > prob:
+            Net.HiddenLayer[x].bias += random.uniform(-fence,fence)
 
     #Outputs
     for x in range(0, len(Net.OutputLayer)):
-            for y in range(0, len(Net.OutputLayer[x].weight)):
-                if random.random() > prob:
-                    Net.OutputLayer[x].weight[y] += random.uniform(-fence,fence)
+        for y in range(0, len(Net.OutputLayer[x].weight)):
             if random.random() > prob:
-                Net.OutputLayer[x].bias += random.uniform(-fence,fence)
+                Net.OutputLayer[x].weight[y] += random.uniform(-fence,fence)
+        if random.random() > prob:
+            Net.OutputLayer[x].bias += random.uniform(-fence,fence)
 
+    Net.score = -99999998
     return Net
 
-def Breed(Net):
-    ChildList = []
-    for i in range(0, (len(Net)-1)):
-        Child = NeuralNet()
+def Breed(ParentA,ParentB):
+    Child = NeuralNet()
 
-        #Average of inputs
-        for x in range(0, len(Net.InputLayer)):
-            for y in range(0, len(Net.InputLayer[x].weight)):
-                Child.InputLayer[x].weight[y] = (Net[x].InputLayer.weight[y] + Net[x+1].InputLayer.weight[y])/2
-            Child.InputLayer[x].Bias = (Net[x].InputLayer.bias + Net[x+1].InputLayer.bias)/2
+    #Average of inputs
+    for x in range(0, len(ParentA.InputLayer)-1):
+        for y in range(0, len(ParentA.InputLayer[x].weight)):
+            Child.InputLayer[x].weight[y] = (ParentA.InputLayer[x].weight[y] + ParentB.InputLayer[x+1].weight[y])/2
+        Child.InputLayer[x].Bias = (ParentA.InputLayer[x].bias + ParentB.InputLayer[x+1].bias)/2
+    
+    #Average of hiddens
+    for x in range(0, len(ParentA.HiddenLayer)-1):
+        for y in range(0, len(ParentA.HiddenLayer[x].weight)):
+            Child.HiddenLayer[x].weight[y] = (ParentA.HiddenLayer[x].weight[y] + ParentB.HiddenLayer[x+1].weight[y])/2
+        Child.HiddenLayer[x].Bias = (ParentA.HiddenLayer[x].bias + ParentB.HiddenLayer[x+1].bias)/2
+
+    #Average of outputs
+    for x in range(0, len(ParentA.OutputLayer)-1):
+        for y in range(0, len(ParentA.OutputLayer[x].weight)):
+            Child.OutputLayer[x].weight[y] = (ParentA.OutputLayer[x].weight[y] + ParentB.OutputLayer[x+1].weight[y])/2
+        Child.OutputLayer[x].Bias = (ParentA.OutputLayer[x].bias + ParentB.OutputLayer[x+1].bias)/2
         
-        #Average of hiddens
-        for x in range(0, len(Net.HiddenLayer)):
-            for y in range(0, len(Net.HiddenLayer[x].weight)):
-                Child.HiddenLayer[x].weight[y] = (Net[x].HiddenLayer.weight[y] + Net[x+1].HiddenLayer.weight[y])/2
-            Child.HiddenLayer[x].Bias = (Net[x].HiddenLayer.bias + Net[x+1].HiddenLayer.bias)/2
-
-        #Average of outputs
-        for x in range(0, len(Net.OutputLayer)):
-            for y in range(0, len(Net.OutputLayer[x].weight)):
-                Child.OutputLayer[x].weight[y] = (Net[x].OutputLayer.weight[y] + Net[x+1].OutputLayer.weight[y])/2
-            Child.OutputLayer[x].Bias = (Net[x].OutputLayer.bias + Net[x+1].OutputLayer.bias)/2
-            
-        ChildList.append(Child)
-
-    return ChildList
+    #puts children at the back
+    Child.score = -99999999
+    return Child
