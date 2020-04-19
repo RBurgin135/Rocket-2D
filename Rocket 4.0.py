@@ -2,7 +2,7 @@
 global g
 g = 1
 global PopSize
-PopSize = 20
+PopSize = 50
 import pygame
 from pygame import FULLSCREEN
 import random
@@ -19,7 +19,7 @@ global scr_height
 scr_width = user32.GetSystemMetrics(0)
 scr_height = user32.GetSystemMetrics(1)
 window = pygame.display.set_mode((scr_width,scr_height),FULLSCREEN)
-pygame.display.set_caption("Rocket 3.0")
+pygame.display.set_caption("Rocket 4.0")
 
 #Objects====
 #======
@@ -30,6 +30,7 @@ class Rocket:
         self.disp = [disp,Alt]
         self.strength = -25
         self.thrust = [0,0]
+        self.testdeg = 0
         self.deg = 0
         self.turn =  "NOT"
 
@@ -37,6 +38,9 @@ class Rocket:
         self.On = pygame.image.load("Rocket on.png")
         self.Off = pygame.image.load("Rocket off.png")
         self.Broken = pygame.image.load("Rocket no-fuel.png")
+        self.explode = pygame.image.load("Rocket explode.png")
+        self.rubble = pygame.image.load("Rocket rubble.png")
+        self.delay = 0
         self.image = self.Off
         self.width = self.image.get_width()
         self.height = self.image.get_height()
@@ -46,8 +50,7 @@ class Rocket:
         self.coord = [X , Y]
 
         #testing values
-        self.crash = False
-        self.SUCCESS = False
+        self.status = "Landing"
         self.tested = False
         self.testU = [0,0]
 
@@ -99,16 +102,20 @@ class Rocket:
 
             #crash and success query
         if (self.disp[1] - self.s[1]) <=0:
-            if (self.crash == False) and (self.u[1] > 25):
-                self.crash = True
-                self.tested = True
-                self.testU[0] = self.u[0]
-                self.testU[1] = self.u[1]
-            if self.crash == False and (self.coord[0] > P.X and (self.coord[0]+self.width) < (P.X+P.width)):
-                self.SUCCESS = True
-                self.tested = True
-                self.testU[0] = self.u[0]
-                self.testU[1] = self.u[1]
+            if (self.status != "CRASH") and ((self.u[1] > 25) or (self.u[0] > 25) or (self.deg > 70 or self.deg < -70)):
+                self.status = "CRASH"
+                self.image = self.explode
+            elif self.status != "CRASH" :
+                if (self.coord[0] > P.X and (self.coord[0]+self.width) < (P.X+P.width)):
+                    self.status = "SUCCESS"
+                else:
+                    self.status = "FAIL"
+
+            #Scoring details recorded
+            self.tested = True
+            self.testU[0] = self.u[0]
+            self.testU[1] = self.u[1]
+            self.testdeg = self.deg
             #prevents movement once landing
             for i in range (0,2):
                 self.s[i] = 0
@@ -117,7 +124,7 @@ class Rocket:
 
 
         #displaces rocket
-        self.disp[0] += self.s[0]
+        self.disp[0] -= self.s[0]
         self.coord[0] -= self.s[0]
         self.disp[1] -= self.s[1]
         self.coord[1] += self.s[1]
@@ -126,7 +133,8 @@ class Rocket:
         #show rocket
         result = pygame.transform.rotate(self.image, self.deg)
         self.blit = [self.coord[0] - result.get_width()/2, self.coord[1] - result.get_height()/2]
-        window.blit(result,(self.blit[0] , self.blit[1]))
+        if self.image != self.rubble:
+            window.blit(result,(self.blit[0] , self.blit[1]))
 
     def Reset(self):
         #find velocity used in next Calculate (v = u + at)
@@ -135,20 +143,25 @@ class Rocket:
 
             #reset values
             self.thrust[i] = 0
+        
+        if self.image == self.explode:
+            self.delay += 1
+            if self.delay == 10:
+                self.image = self.rubble
+        elif self.image == self.rubble:
+            pass
+        else:
+            self.image = self.Off
+
         self.strength = 0
-        self.image = self.Off
         self.turn = "NOT"
 
     def TurnLeft(self):
         self.deg += 1
-        if self.deg > 180:
-            self.deg = -179
         self.turn = pygame.image.load("Left.png")
         
     def TurnRight(self):
         self.deg -= 1
-        if self.deg < -180:
-            self.deg = 179 
         self.turn = pygame.image.load("Right.png")
            
 #======
@@ -231,15 +244,15 @@ def Diagnostics(Pop):
                 pygame.draw.rect(window,(255,127,39),details)
             
             #fuel gauge
-            if Pop[i].fuel > 0:
-                details = (X, Y+21, Pop[i].fuel/4, 5)
-                pygame.draw.rect(window,(255,127,39),details)
+            #if Pop[i].fuel > 0:
+            #    details = (X, Y+21, Pop[i].fuel/4, 5)
+            #    pygame.draw.rect(window,(255,127,39),details)
 
             #Altimeter
             details = (X-6, Y+20-Pop[i].disp[1]/15, 5, Pop[i].disp[1]/15)
             pygame.draw.rect(window,(255,255,127),details)
         else:
-            if Pop[i].SUCCESS == True:
+            if Pop[i].status == "SUCCESS":
                 pygame.draw.rect(window,(76,166,76),details)
             else:
                 pygame.draw.rect(window,(166,166,166),details)
@@ -271,14 +284,13 @@ def GenerationMngmnt(Pop, GenNumber):
 
 def NNDiag(Pop):
     Net = Pop[0].Nn
-    Layers = [Net.InputLayer, Net.HiddenLayer, Net.OutputLayer]
     ICenters = []
     HCenters = []
     OCenters = []
 
     #draws circles
     for x in range(0, 3):
-        for y in range(0, len(Layers[x])):
+        for y in range(0, len(Net.Layers[x])):
             pygame.draw.circle(window, (166,166,166), (1200+200*x,50+y*70), 30, 0)
             if x == 0:
                 ICenters.append((1200+200*x,50+y*70))
@@ -292,14 +304,37 @@ def NNDiag(Pop):
     for L in range(0,len(CombinedCenters)-1):
         for O in range(0, len(CombinedCenters[L])):
             for D in range(0, len(CombinedCenters[L+1])):
-                if Layers[L+1][D].weight[O] > 0:
+                if Net.Layers[L+1][D].weight[O] > 0:
                     colour = (173,216,230)
                 else:
                     colour = (128,0,0)
-                width = int(round(abs(Layers[L+1][D].weight[O])*5))
+                width = int(round(abs(Net.Layers[L+1][D].weight[O])*5))
                 if width == 0:
                     width = 1
                 pygame.draw.line(window, colour, CombinedCenters[L][O], CombinedCenters[L+1][D], width)
+
+def Control(Pop, GenNumber):
+    #end button
+    details = scr_width-50, 0, 50, 50
+    pygame.draw.rect(window,(255,0,0),details)
+    #load button
+    details = scr_width-100, 0, 50, 50
+    pygame.draw.rect(window,(0,0,255),details)
+    #save button
+    details = scr_width-150, 0, 50, 50
+    pygame.draw.rect(window,(0,255,0),details)
+
+    RUN = True
+    for event in pygame.event.get():
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            Mx, My = pygame.mouse.get_pos()
+            if Mx > scr_width-50 and Mx < scr_width and My < 50:
+                RUN = False
+            if Mx > scr_width-100 and Mx < scr_width-50 and My < 50:
+                Pop, GenNumber = Networking.Read(Pop)
+            if Mx > scr_width-150 and Mx < scr_width-100 and My < 50:
+                Networking.Write(GenNumber, Pop)
+    return RUN, Pop, GenNumber
 
 G = Ground()
 P = Pad()
@@ -319,11 +354,12 @@ while RUN:
 
     for i in range(0,PopSize):
         Pop[i].Calculate()
-
+    
     G.Show()
     P.Show()
     Diagnostics(Pop)
-    NNDiag(Pop)
+    #NNDiag(Pop)
+    RUN, Pop, GenNumber = Control(Pop, GenNumber)
 
     pygame.display.update()
     for i in range(0, PopSize):
@@ -332,5 +368,3 @@ while RUN:
     #generation managment
     GenNumber, Pop = GenerationMngmnt(Pop, GenNumber)
 pygame.quit()
-
-        

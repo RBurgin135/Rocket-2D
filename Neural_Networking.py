@@ -9,59 +9,42 @@ import numpy
 
 #Objects==========
 class NeuralNet:
-    def __init__(self):
-        self.InputNum = 8
-        self.HiddenNum = 4
-        self.OutputNum = 3
+    def __init__(self):        
+        self.layernum = 3 #number of layers
+        self.neuronnum = [8,4,3] #neurons for each layer
+        self.inputnum = [1,8,4] #inputs for each layer
 
         #layers
-        self.InputLayer = []
-        self.HiddenLayer = []
-        self.OutputLayer = []
-        #Inputs
-        #Altitude, displacement, horizontal velocity, vertical velocity, horizontal acceleration, vertical acceleration, fuel, degrees
-        for i in range(0,self.InputNum):
-            self.InputLayer.append(Neuron(1))
-
-        #Hidden
-        for i in range(0,self.HiddenNum):
-            self.HiddenLayer.append(Neuron(self.InputNum))
-
-        #Outputs
-        #Thrust, Turn left, Turn right
-        for i in range(0,self.OutputNum):
-            self.OutputLayer.append(Neuron(self.HiddenNum))
+        self.Layers = []
+        for x in range(0,self.layernum): #cycles through layers
+            self.Layers.append([]) #adds a new layer
+            for y in range(0,self.neuronnum[x]): #cycles through neurons
+                self.Layers[x].append(Neuron(self.inputnum[x])) #adds the neurons to the layer with specified number of inputs
 
         #Score
         self.score = 0
 
-    def Forward(self, InputInputs):
-        #Input
-        HiddenInputs = []
-        for i in range(0,self.InputNum):
-            HiddenInputs.append(self.InputLayer[i].ActivationFunction(InputInputs[i]))
-        
-        #Hidden
-        OutputInputs = []
-        for i in range(0, self.HiddenNum):
-            OutputInputs.append(self.HiddenLayer[i].ActivationFunction(HiddenInputs)) 
+    def Forward(self, Inputs):
+        Processing = [[]]
+        for i in range(0,len(Inputs)): #cycles through the inputs so each neuron in the input layer has its own input
+            Processing[0].append(self.Layers[0][i].ActivationFunction(Inputs[i])) #runs inputs through activation function and adds outputs to processing
+        for x in range(0,self.layernum): #cycles through the layers after the input layer
+            Processing.append([]) 
+            for y in range(0,self.neuronnum[x]):#cycles through neurons
+                Processing[x+1].append(self.Layers[x][y].ActivationFunction(Processing[x])) #runs inputs through activation function and adds outputs to processing
 
-        #Output
-        OutputOutputs = []
-        for i in range(0, self.OutputNum):
-            OutputOutputs.append(self.OutputLayer[i].ActivationFunction(OutputInputs)) 
-
-        return  OutputOutputs
+        return  Processing[len(Processing)-1] #returns output layers outputs
 
     def Scoring(self, Details):
         self.score = 0
-        self.score += -abs(Details[0])*1000 
-        #self.score += -Details[1][0] * 50
-        #self.score += -Details[1][1] * 50
-        #self.score += Details[2] * 10
-        if Details[3] == True:
-            self.score += 1000000
-
+        if Details[0] == "SUCCESS":
+            self.score += 1*(10**16)
+        self.score += int((999 - abs(Details[1][1])) *(10**12))
+        self.score += int((999 - abs(Details[1][0])) *(10**6))
+        self.score += int((999 - abs(Details[2])) *(10**9))
+        self.score += int((999 - abs(Details[3])) *(10**12))
+        self.score += int(Details[4] *(10**3))
+       
 #======= 
 class Neuron:
     def __init__(self, num_inputs):
@@ -102,11 +85,11 @@ def Review(Pop):
     NewNetlist = []
     for i in range(0,len(Pop)):
         Netlist.append(Pop[i].Nn) 
-        Netlist[len(Netlist)-1].Scoring([Pop[i].disp[0], Pop[i].testU, Pop[i].fuel, Pop[i].SUCCESS])
+        Netlist[len(Netlist)-1].Scoring([Pop[i].status, Pop[i].testU, Pop[i].testdeg, Pop[i].disp[0], Pop[i].fuel])
     
     Netlist = Sort(Netlist)
-    #print("Score: ",Pop[0].Nn.score)
-    #print("Velocity: ",Pop[0].testU)
+    #for i in Netlist:
+    #    print(i.score)
 
     #Clone
     CloneNo = int(len(Pop)//6)
@@ -148,29 +131,13 @@ def Mutate(Net):
     fence = 0.01
     prob = 0.7
     
-    #Inputs
-    for x in range(0, len(Net.InputLayer)):
-        for y in range(0, len(Net.InputLayer[x].weight)):
+    for z in range(0, len(Net.Layers)): #cycles through layers
+        for x in range(0, len(Net.Layers[z])): #cycles through neurons
+            for y in range(0, len(Net.Layers[z][x].weight)): #cycles through weights
+                if random.random() > prob:
+                    Net.Layers[z][x].weight[y] += random.uniform(-fence,fence) #mutates weights
             if random.random() > prob:
-                Net.InputLayer[x].weight[y] += random.uniform(-fence,fence)
-        if random.random() > prob:
-            Net.InputLayer[x].bias += random.uniform(-fence,fence)
-
-    #Hidden
-    for x in range(0, len(Net.HiddenLayer)):
-        for y in range(0, len(Net.HiddenLayer[x].weight)):
-            if random.random() > prob:
-                Net.HiddenLayer[x].weight[y] += random.uniform(-fence,fence)
-        if random.random() > prob:
-            Net.HiddenLayer[x].bias += random.uniform(-fence,fence)
-
-    #Outputs
-    for x in range(0, len(Net.OutputLayer)):
-        for y in range(0, len(Net.OutputLayer[x].weight)):
-            if random.random() > prob:
-                Net.OutputLayer[x].weight[y] += random.uniform(-fence,fence)
-        if random.random() > prob:
-            Net.OutputLayer[x].bias += random.uniform(-fence,fence)
+                Net.Layers[z][x].bias += random.uniform(-fence,fence) #mutates bias
 
     Net.score = -99999998
     return Net
@@ -179,23 +146,67 @@ def Breed(ParentA,ParentB):
     Child = NeuralNet()
 
     #Average of inputs
-    for x in range(0, len(ParentA.InputLayer)-1):
-        for y in range(0, len(ParentA.InputLayer[x].weight)):
-            Child.InputLayer[x].weight[y] = (ParentA.InputLayer[x].weight[y] + ParentB.InputLayer[x+1].weight[y])/2
-        Child.InputLayer[x].Bias = (ParentA.InputLayer[x].bias + ParentB.InputLayer[x+1].bias)/2
-    
-    #Average of hiddens
-    for x in range(0, len(ParentA.HiddenLayer)-1):
-        for y in range(0, len(ParentA.HiddenLayer[x].weight)):
-            Child.HiddenLayer[x].weight[y] = (ParentA.HiddenLayer[x].weight[y] + ParentB.HiddenLayer[x+1].weight[y])/2
-        Child.HiddenLayer[x].Bias = (ParentA.HiddenLayer[x].bias + ParentB.HiddenLayer[x+1].bias)/2
-
-    #Average of outputs
-    for x in range(0, len(ParentA.OutputLayer)-1):
-        for y in range(0, len(ParentA.OutputLayer[x].weight)):
-            Child.OutputLayer[x].weight[y] = (ParentA.OutputLayer[x].weight[y] + ParentB.OutputLayer[x+1].weight[y])/2
-        Child.OutputLayer[x].Bias = (ParentA.OutputLayer[x].bias + ParentB.OutputLayer[x+1].bias)/2
+    for z in range(0, len(ParentA.Layers)): #cycles through layers
+        for x in range(0, len(ParentA.Layers[z])-1): #cycles through neurons
+            for y in range(0, len(ParentA.Layers[z][x].weight)): #cycles through weights
+                Child.Layers[z][x].weight[y] = (ParentA.Layers[z][x].weight[y] + ParentB.Layers[z][x+1].weight[y])/2 #finds average between two parent weights
+            Child.Layers[z][x].Bias = (ParentA.Layers[z][x].bias + ParentB.Layers[z][x+1].bias)/2 #finds average between two parent biases
         
     #puts children at the back
     Child.score = -99999999
     return Child
+
+def Write(GenNumber, Pop):
+    name =  input("Name the file to save: ")
+    f = open(name+".txt", "w")
+    Nets = []
+    for i in range(0,len(Pop)):
+        Nets.append(Pop[i].Nn)
+    
+    #encodes the data
+    f.write((str(GenNumber)+","))
+    for z in range(0,len(Nets)): #cycles through the nets
+        f.write("N,")
+        for x in range(0, len(Nets[z].Layers)): #cycles through layers
+            f.write("L,")
+            for y in range(0, len(Nets[z].Layers[x])): #cycles through neurons
+                f.write("n,")
+                for i in range(0, len(Nets[z].Layers[x][y].weight)): #cycles through weights
+                    f.write(("w,"+str(Nets[z].Layers[x][y].weight[i])+","))
+                f.write(("b,"+str(Nets[z].Layers[x][y].bias)+","))
+    f.close()
+
+def Read(Pop):
+    name =  input("Name the file to load: ")
+    f = open(name+".txt", "r")
+
+    #decodes the data
+    block = f.readline()
+    chunks = block.split(",")
+    #declaring indexes
+    Ni = -1
+    GenNumber = int(chunks[0])
+    for i in range(0,len(chunks)):
+        if chunks[i] == "N":#cycles through the nets
+            Ni += 1
+            Li = -1
+        if chunks[i] == "L": #cycles through the layers
+            Li += 1
+            ni = -1
+        if chunks[i] == "n":#cycles through neurons
+            ni += 1
+            wi = -1
+        if chunks[i] == "w":#cycles through weights
+            wi += 1
+            Pop[Ni].Nn.Layers[Li][ni].weight[wi] = float(chunks[i+1])
+        if chunks[i] == "b":
+            Pop[Ni].Nn.Layers[Li][ni].bias = float(chunks[i+1])
+
+    #resets rocket
+    StartAltitude = random.randint(2500,2500)
+    StartDisplacement = random.randint(-500,-500)
+    for i in range(0, len(Pop)):
+        Pop[i].__init__(StartDisplacement, StartAltitude, True)
+
+
+    return Pop, GenNumber
