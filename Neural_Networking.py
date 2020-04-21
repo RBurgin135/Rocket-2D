@@ -37,13 +37,13 @@ class NeuralNet:
 
     def Scoring(self, Details):
         self.score = 0
-        if Details[0] == "SUCCESS":
-            self.score += 1*(10**16)
-        self.score += int((999 - abs(Details[1][1])) *(10**12))
-        self.score += int((999 - abs(Details[1][0])) *(10**6))
-        self.score += int((999 - abs(Details[2])) *(10**9))
-        self.score += int((999 - abs(Details[3])) *(10**12))
-        self.score += int(Details[4] *(10**3))
+        #if Details[0] == "SUCCESS":
+        #    self.score += 1*(10**16)
+        self.score += -Details[1][1] * 50
+        #self.score += int((999 - abs(Details[1][0])) *(10**6))
+        #self.score += int((999 - abs(Details[2])) *(10**9))
+        self.score += - abs(Details[3]) * 10
+        self.score += Details[4]
        
 #======= 
 class Neuron:
@@ -87,9 +87,12 @@ def Review(Pop):
         Netlist.append(Pop[i].Nn) 
         Netlist[len(Netlist)-1].Scoring([Pop[i].status, Pop[i].testU, Pop[i].testdeg, Pop[i].disp[0], Pop[i].fuel])
     
-    Netlist = Sort(Netlist)
+    #print("===============================================")
     #for i in Netlist:
     #    print(i.score)
+
+    Netlist = Sort(Netlist)
+    
 
     #Clone
     CloneNo = int(len(Pop)//6)
@@ -131,6 +134,7 @@ def Mutate(Net):
     fence = 0.01
     prob = 0.7
     
+    #Inputs
     for z in range(0, len(Net.Layers)): #cycles through layers
         for x in range(0, len(Net.Layers[z])): #cycles through neurons
             for y in range(0, len(Net.Layers[z][x].weight)): #cycles through weights

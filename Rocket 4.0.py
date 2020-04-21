@@ -112,10 +112,14 @@ class Rocket:
                     self.status = "FAIL"
 
             #Scoring details recorded
-            self.tested = True
-            self.testU[0] = self.u[0]
-            self.testU[1] = self.u[1]
-            self.testdeg = self.deg
+            if self.tested == False:
+                self.tested = True
+                self.testU[0] = self.u[0]
+                self.testU[1] = self.u[1]
+                self.testdeg = self.deg
+
+            
+            
             #prevents movement once landing
             for i in range (0,2):
                 self.s[i] = 0
@@ -254,8 +258,10 @@ def Diagnostics(Pop):
         else:
             if Pop[i].status == "SUCCESS":
                 pygame.draw.rect(window,(76,166,76),details)
-            else:
+            elif Pop[i].status == "FAIL":
                 pygame.draw.rect(window,(166,166,166),details)
+            else:
+                pygame.draw.rect(window,(128,0,0),details)
         
         if Pop[i].turn != "NOT":
             window.blit(Pop[i].turn,(X+5,Y))
