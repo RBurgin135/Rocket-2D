@@ -37,12 +37,14 @@ class NeuralNet:
 
     def Scoring(self, Details):
         self.score = 0
-        #if Details[0] == "SUCCESS":
-        #    self.score += 1*(10**16)
+        if Details[0] == "SUCCESS":
+            self.score += 1*(10**16)
+        elif Details[0] == "FAIL":
+            self.score += 800
         self.score += -Details[1][1] * 50
         #self.score += int((999 - abs(Details[1][0])) *(10**6))
-        #self.score += int((999 - abs(Details[2])) *(10**9))
-        self.score += - abs(Details[3]) * 10
+        self.score += abs(Details[2]) *10
+        self.score += - abs(Details[3]) * 9
         self.score += Details[4]
        
 #======= 
@@ -90,7 +92,8 @@ def Review(Pop):
     #print("===============================================")
     #for i in Netlist:
     #    print(i.score)
-
+    #for i in range(0,3):
+    #    print(Pop[i].disp[0])
     Netlist = Sort(Netlist)
     
 

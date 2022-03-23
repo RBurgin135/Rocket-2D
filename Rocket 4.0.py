@@ -253,8 +253,8 @@ def Diagnostics(Pop):
             #    pygame.draw.rect(window,(255,127,39),details)
 
             #Altimeter
-            details = (X-6, Y+20-Pop[i].disp[1]/15, 5, Pop[i].disp[1]/15)
-            pygame.draw.rect(window,(255,255,127),details)
+            #details = (X-6, Y+20-Pop[i].disp[1]/15, 5, Pop[i].disp[1]/15)
+            #pygame.draw.rect(window,(255,255,127),details)
         else:
             if Pop[i].status == "SUCCESS":
                 pygame.draw.rect(window,(76,166,76),details)
@@ -263,8 +263,8 @@ def Diagnostics(Pop):
             else:
                 pygame.draw.rect(window,(128,0,0),details)
         
-        if Pop[i].turn != "NOT":
-            window.blit(Pop[i].turn,(X+5,Y))
+        #if Pop[i].turn != "NOT":
+        #    window.blit(Pop[i].turn,(X+5,Y))
 
 def GenerationMngmnt(Pop, GenNumber):
     GenTest = True
@@ -280,8 +280,8 @@ def GenerationMngmnt(Pop, GenNumber):
         NewNets = Networking.Review(Pop)
 
         #new gen reset rockets
-        StartAltitude = random.randint(2500,2500)
-        StartDisplacement = random.randint(-500,-500)
+        StartAltitude = random.randint(2500,5000)
+        StartDisplacement = random.randint(-750,-250)
         for i in range(0,PopSize):
             Pop[i].Nn = NewNets[i]
             Pop[i].__init__(StartDisplacement, StartAltitude, True)
@@ -345,8 +345,8 @@ def Control(Pop, GenNumber):
 G = Ground()
 P = Pad()
 Pop = []
-StartAltitude = random.randint(2500,2500)
-StartDisplacement = random.randint(-500,-500)
+StartAltitude = random.randint(2500,5000)
+StartDisplacement = random.randint(-750,-250)
 for i in range(0,PopSize):
     Pop.append(Rocket(StartDisplacement, StartAltitude, False))
 GenNumber = 1
